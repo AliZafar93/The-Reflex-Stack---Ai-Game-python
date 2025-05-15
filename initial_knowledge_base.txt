@@ -1,0 +1,10 @@
+car,Automobile
+dog,Animal
+apple,Vegetable
+truck,Automobile
+cat,Animal
+banana,Vegetable
+bus,Automobile
+lion,Animal
+carrot,Vegetable
+train,Automobile
