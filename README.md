@@ -89,6 +89,4 @@ Enhanced AI visualization
 This project is licensed under the MIT License - see the LICENSE file for details.
 🙏 Acknowledgements
 
-Department of Computer Science
-Instructor: Faryal Farooq
 WordNet lexical database
