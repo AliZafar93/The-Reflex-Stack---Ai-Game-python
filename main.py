@@ -10,14 +10,14 @@ from nltk.corpus import wordnet as wn
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 
-# Word database
+# Expanded Word Database
 word_database = {
-    "automobile": ["car", "truck", "ferrari", "cycle", "BMW"],
-    "animal": ["cat", "dog", "lion", "tiger", "horse"],
-    "vegetable": ["carrot", "potato", "tomato", "onion", "lettuce"]
+    "automobile": ["car", "truck", "ferrari", "cycle", "bmw", "audi", "bus", "jeep", "motorbike", "van", "scooter"],
+    "animal": ["cat", "dog", "lion", "tiger", "horse", "elephant", "giraffe", "zebra", "goat", "bear", "monkey", "kangaroo"],
+    "vegetable": ["carrot", "potato", "tomato", "onion", "lettuce", "spinach", "broccoli", "pepper", "cabbage", "cucumber", "radish"]
 }
 
-# Classification using WordNet
+# Classification using WordNet with fallback
 def classify_word(word):
     word = word.lower()
     synsets = wn.synsets(word)
@@ -35,11 +35,11 @@ def classify_word(word):
             elif "vehicle" in name or "automobile" in name or "car" in name:
                 return "automobile"
 
-    # Fallback keyword-based check
+    # Fallback keywords
     categories = {
-        "automobile": ["car", "truck", "bike", "motorcycle", "jeep", "cycle"],
-        "animal": ["dog", "cat", "lion", "elephant", "tiger", "horse", "goat", "cow", "rabbit", "wolf", "bear"],
-        "vegetable": ["carrot", "onion", "spinach", "lettuce", "potato", "broccoli", "tomato", "pepper", "cucumber"]
+        "automobile": ["car", "truck", "bike", "motorcycle", "jeep", "cycle", "scooter"],
+        "animal": ["dog", "cat", "lion", "elephant", "tiger", "horse", "goat", "cow", "rabbit", "wolf", "bear", "monkey"],
+        "vegetable": ["carrot", "onion", "spinach", "lettuce", "potato", "broccoli", "tomato", "pepper", "cucumber", "radish"]
     }
 
     for category, keywords in categories.items():
@@ -49,7 +49,7 @@ def classify_word(word):
     return "unknown"
 
 
-# Main Game Class
+# Game Class
 class ReflexGame:
     def __init__(self, root):
         self.root = root
@@ -84,36 +84,37 @@ class ReflexGame:
             return
 
         self.classified_new_words = {word: classify_word(word) for word in self.new_words}
-        # Remove unknown words
-        # Remove unknown words
+        unknown_words = [word for word in self.new_words if self.classified_new_words[word] == "unknown"]
         self.new_words = [word for word in self.new_words if self.classified_new_words[word] != "unknown"]
         self.classified_new_words = {word: cat for word, cat in self.classified_new_words.items() if cat != "unknown"}
 
         if not self.new_words:
-            messagebox.showerror("Error", "All entered words are unrecognized by the AI. Try different ones.")
+            messagebox.showerror("Error", "All entered words are unrecognized. Try different ones.")
             return
-
 
         result_window = tk.Toplevel(self.root)
         result_window.title("Classification Results")
         for word, cat in self.classified_new_words.items():
             tk.Label(result_window, text=f"{word} → {cat.title()}").pack()
+        if unknown_words:
+            tk.Label(result_window, text="--- Unknown Words ---", fg="red").pack()
+            for word in unknown_words:
+                tk.Label(result_window, text=word, fg="red").pack()
         tk.Button(result_window, text="Start Game", command=lambda: [result_window.destroy(), self.start_game()]).pack()
 
     def start_game(self):
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        # Filter out unknown DB words
         db_words = random.sample(word_database["automobile"] + word_database["animal"] + word_database["vegetable"], 5)
         self.game_words = db_words + self.new_words
         self.game_words = [word for word in self.game_words if classify_word(word) != "unknown"]
-
         random.shuffle(self.game_words)
         self.current_word_index = 0
+
         self.create_game_ui()
         self.root.bind("<Key>", self.handle_keypress)
-        threading.Thread(target=self.play_next_word).start()
+        threading.Thread(target=self.play_words_sequence).start()
 
     def create_game_ui(self):
         self.status_label = tk.Label(self.root, text="Get Ready!", font=("Arial", 14, "bold"))
@@ -125,56 +126,51 @@ class ReflexGame:
         frame = tk.Frame(self.root)
         frame.pack(pady=5)
 
+        self.user_labels = {}
         user_frame = tk.LabelFrame(frame, text="You", padx=10, pady=5)
         user_frame.grid(row=0, column=0, padx=20)
-        self.user_labels = {}
         for i, cat in enumerate(["automobile", "animal", "vegetable"]):
             tk.Label(user_frame, text=cat.title()).grid(row=0, column=i)
-            lbl = tk.Listbox(user_frame, height=10, width=15)
-            lbl.grid(row=1, column=i)
-            self.user_labels[cat] = lbl
+            lst = tk.Listbox(user_frame, height=10, width=15)
+            lst.grid(row=1, column=i)
+            self.user_labels[cat] = lst
 
+        self.ai_labels = {}
         ai_frame = tk.LabelFrame(frame, text="AI Bot", padx=10, pady=5)
         ai_frame.grid(row=0, column=1, padx=20)
-        self.ai_labels = {}
         for i, cat in enumerate(["automobile", "animal", "vegetable"]):
             tk.Label(ai_frame, text=cat.title()).grid(row=0, column=i)
-            lbl = tk.Listbox(ai_frame, height=10, width=15)
-            lbl.grid(row=1, column=i)
-            self.ai_labels[cat] = lbl
+            lst = tk.Listbox(ai_frame, height=10, width=15)
+            lst.grid(row=1, column=i)
+            self.ai_labels[cat] = lst
 
         tk.Label(self.root, text="Controls: 1 = Automobile | 2 = Animal | 3 = Vegetable").pack(pady=5)
 
-    def play_next_word(self):
+    def play_words_sequence(self):
         while self.current_word_index < len(self.game_words):
-            self.current_word = self.game_words[self.current_word_index]
-            self.word_label.config(text=self.current_word)
+            word = self.game_words[self.current_word_index]
+            self.current_word = word
+            self.word_label.config(text=word)
 
-            ai_guess = classify_word(self.current_word)
+            ai_guess = self.ai_classify_with_mistake(word)
             if ai_guess in self.ai_stacks:
-                self.ai_stacks[ai_guess].append(self.current_word)
-                self.ai_labels[ai_guess].insert(tk.END, self.current_word)
-            else:
-                print(f"AI skipped unknown word: {self.current_word}")
-                self.current_word_index += 1
-                continue
+                self.ai_stacks[ai_guess].append(word)
+                self.ai_labels[ai_guess].insert(tk.END, word)
 
-            correct_cat = self.get_correct_category(self.current_word)
-            self.ai_results[self.current_word] = (ai_guess == correct_cat)
+            correct_cat = self.get_correct_category(word)
+            self.ai_results[word] = (ai_guess == correct_cat)
 
-            time.sleep(2.5)
+            time.sleep(2)
             self.current_word_index += 1
-            if self.current_word_index >= len(self.game_words):
-                break
-            self.word_label.config(text=self.game_words[self.current_word_index])
 
         self.end_game()
 
-    def get_correct_category(self, word):
-        for category, words in word_database.items():
-            if word in words:
-                return category
-        return self.classified_new_words.get(word, "unknown")
+    def ai_classify_with_mistake(self, word):
+        correct_category = classify_word(word)
+        if random.random() < 0.2:  # 20% chance to make a mistake
+            wrong_categories = [cat for cat in ["automobile", "animal", "vegetable"] if cat != correct_category]
+            return random.choice(wrong_categories)
+        return correct_category
 
     def handle_keypress(self, event):
         key_map = {"1": "automobile", "2": "animal", "3": "vegetable"}
@@ -186,12 +182,26 @@ class ReflexGame:
             correct_cat = self.get_correct_category(word)
             self.user_results[word] = (cat == correct_cat)
 
+    def get_correct_category(self, word):
+        for cat, words in word_database.items():
+            if word in words:
+                return cat
+        return self.classified_new_words.get(word, "unknown")
+
     def end_game(self):
         self.root.unbind("<Key>")
         correct_user = sum(self.user_results.values())
         correct_ai = sum(self.ai_results.values())
-        result_text = f"{'AI Wins!' if correct_ai > correct_user else 'You Win!' if correct_user > correct_ai else 'Draw!'} (You: {correct_user}, AI: {correct_ai})"
-        self.status_label.config(text=result_text)
+
+        if correct_user > correct_ai:
+            result = "You Win!"
+        elif correct_ai > correct_user:
+            result = "AI Wins!"
+        else:
+            result = "Draw!"
+
+        self.status_label.config(text=f"{result} (You: {correct_user}, AI: {correct_ai})")
+        self.word_label.config(text="Game Over!")
 
         for cat, lst in self.user_labels.items():
             for i in range(lst.size()):
@@ -203,7 +213,6 @@ class ReflexGame:
                 word = lst.get(i)
                 lst.itemconfig(i, {'fg': 'green' if self.ai_results.get(word, False) else 'red'})
 
-        self.word_label.config(text="Game Over!")
 
 # Run the game
 if __name__ == "__main__":
