@@ -1,5 +1,6 @@
-# filepath: /reflex_game/reflex_game/src/main.py
-
+#Ai Game: Reflex Game
+#Ali Zafar [221443]
+#Shumail Ali [221479]
 import time
 from game_logic.containers import Container
 from game_logic.word_manager import WordManager

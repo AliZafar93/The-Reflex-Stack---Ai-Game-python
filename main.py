@@ -77,16 +77,17 @@ class ReflexGame:
         tk.Button(self.root, text="Classify & Start Game", command=self.classify_and_confirm_words).pack()
         tk.Label(self.root, text="Controls: 1 = Automobile | 2 = Animal | 3 = Vegetable").pack()
 
+    # In classify_and_confirm_words, store the classified categories for new words
     def classify_and_confirm_words(self):
         self.new_words = [e.get().strip() for e in self.entries if e.get().strip()]
         if len(self.new_words) != 5:
             messagebox.showerror("Error", "Please enter exactly 5 words.")
             return
 
-        self.classified_new_words = {word: classify_word(word) for word in self.new_words}
-        unknown_words = [word for word in self.new_words if self.classified_new_words[word] == "unknown"]
+        # Use get_correct_category to classify words
+        self.classified_new_words = {word: self.get_correct_category(word) for word in self.new_words}
+        unknown_words = [word for word, cat in self.classified_new_words.items() if cat == "unknown"]
         self.new_words = [word for word in self.new_words if self.classified_new_words[word] != "unknown"]
-        self.classified_new_words = {word: cat for word, cat in self.classified_new_words.items() if cat != "unknown"}
 
         if not self.new_words:
             messagebox.showerror("Error", "All entered words are unrecognized. Try different ones.")
@@ -94,7 +95,8 @@ class ReflexGame:
 
         result_window = tk.Toplevel(self.root)
         result_window.title("Classification Results")
-        for word, cat in self.classified_new_words.items():
+        for word in self.new_words:
+            cat = self.classified_new_words[word]
             tk.Label(result_window, text=f"{word} → {cat.title()}").pack()
         if unknown_words:
             tk.Label(result_window, text="--- Unknown Words ---", fg="red").pack()
@@ -106,9 +108,17 @@ class ReflexGame:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        db_words = random.sample(word_database["automobile"] + word_database["animal"] + word_database["vegetable"], 5)
+        # Get 5 random words from each category first
+        db_words = []
+        for category in ["automobile", "animal", "vegetable"]:
+            db_words.extend(random.sample(word_database[category], min(5, len(word_database[category]))))
+        
+        # Then randomly select 5 words from all selected words
+        db_words = random.sample(db_words, 5)
+        
+        # Combine with user's new words and shuffle
         self.game_words = db_words + self.new_words
-        self.game_words = [word for word in self.game_words if classify_word(word) != "unknown"]
+        self.game_words = [word for word in self.game_words if self.get_correct_category(word) != "unknown"]
         random.shuffle(self.game_words)
         self.current_word_index = 0
 
@@ -160,7 +170,7 @@ class ReflexGame:
             correct_cat = self.get_correct_category(word)
             self.ai_results[word] = (ai_guess == correct_cat)
 
-            time.sleep(2)
+            time.sleep(1)  # <-- Reduce this value for faster word appearance
             self.current_word_index += 1
 
         self.end_game()
@@ -182,16 +192,22 @@ class ReflexGame:
             correct_cat = self.get_correct_category(word)
             self.user_results[word] = (cat == correct_cat)
 
+    # In get_correct_category, always use self.classified_new_words for new words
     def get_correct_category(self, word):
+        # Check if the word exists in the database
         for cat, words in word_database.items():
             if word in words:
                 return cat
+        # Use the classified category for new words
         return self.classified_new_words.get(word, "unknown")
 
+    # In end_game, count only unique correct answers
     def end_game(self):
         self.root.unbind("<Key>")
-        correct_user = sum(self.user_results.values())
-        correct_ai = sum(self.ai_results.values())
+
+        # Calculate scores based on unique correct answers
+        correct_user = sum(1 for word, correct in self.user_results.items() if correct)
+        correct_ai = sum(1 for word, correct in self.ai_results.items() if correct)
 
         if correct_user > correct_ai:
             result = "You Win!"
@@ -203,11 +219,13 @@ class ReflexGame:
         self.status_label.config(text=f"{result} (You: {correct_user}, AI: {correct_ai})")
         self.word_label.config(text="Game Over!")
 
+        # Highlight user results
         for cat, lst in self.user_labels.items():
             for i in range(lst.size()):
                 word = lst.get(i)
                 lst.itemconfig(i, {'fg': 'green' if self.user_results.get(word, False) else 'red'})
 
+        # Highlight AI results
         for cat, lst in self.ai_labels.items():
             for i in range(lst.size()):
                 word = lst.get(i)
