@@ -15,9 +15,9 @@ nltk.download('omw-1.4')
 
 # Expanded Word Database
 word_database = {
-    "automobile": ["car", "truck", "ferrari", "cycle", "bmw", "audi", "bus", "jeep", "motorbike", "van", "scooter"],
-    "animal": ["cat", "dog", "lion", "tiger", "horse", "elephant", "giraffe", "zebra", "goat", "bear", "monkey", "kangaroo"],
-    "vegetable": ["carrot", "potato", "tomato", "onion", "lettuce", "spinach", "broccoli", "pepper", "cabbage", "cucumber", "radish"]
+    "automobile": ["car", "truck", "ferrari", "cycle", "bmw", "audi", "bus", "motorbike", "van", "scooter"],
+    "animal": ["cat", "dog", "tiger", "horse", "elephant", "giraffe", "zebra", "goat", "bear", "monkey", "kangaroo"],
+    "vegetable": [ "potato", "tomato", "onion", "lettuce", "spinach", "broccoli", "pepper", "cabbage", "cucumber", "radish"]
 }
 
 # Classification using WordNet with fallback
@@ -25,24 +25,23 @@ def classify_word(word):
     word = word.lower()
     synsets = wn.synsets(word)
 
-    if not synsets:
-        return "unknown"
+    # Check WordNet synsets for classification
+    if synsets:
+        for syn in synsets:
+            for hypernym in syn.hypernyms():
+                name = hypernym.name().lower()
+                if "animal" in name or "mammal" in name or "bird" in name:
+                    return "animal"
+                elif "vegetable" in name or "plant" in name or "edible_fruit" in name or "edible_vegetable" in name:
+                    return "vegetable"
+                elif "vehicle" in name or "automobile" in name or "car" in name:
+                    return "automobile"
 
-    for syn in synsets:
-        for hypernym in syn.hypernyms():
-            name = hypernym.name().lower()
-            if "animal" in name or "mammal" in name:
-                return "animal"
-            elif "vegetable" in name or "plant" in name or "edible_fruit" in name or "edible_vegetable" in name:
-                return "vegetable"
-            elif "vehicle" in name or "automobile" in name or "car" in name:
-                return "automobile"
-
-    # Fallback keywords
+    # Fallback keywords for classification
     categories = {
-        "automobile": ["car", "truck", "bike", "motorcycle", "jeep", "cycle", "scooter"],
-        "animal": ["dog", "cat", "lion", "elephant", "tiger", "horse", "goat", "cow", "rabbit", "wolf", "bear", "monkey"],
-        "vegetable": ["carrot", "onion", "spinach", "lettuce", "potato", "broccoli", "tomato", "pepper", "cucumber", "radish"]
+        "automobile": ["car", "truck", "bike", "motorcycle", "cycle", "scooter", "bicycle", "submarine"],
+        "animal": ["dog", "cat", "elephant", "tiger", "horse", "goat", "cow", "rabbit", "wolf", "bear", "monkey", "parrot"],
+        "vegetable": [ "onion", "spinach", "lettuce", "potato", "broccoli", "tomato", "pepper", "cucumber", "radish", "rose"]
     }
 
     for category, keywords in categories.items():
@@ -51,6 +50,28 @@ def classify_word(word):
 
     return "unknown"
 
+
+def get_word_category(word):
+    synsets = wn.synsets(word, pos=wn.NOUN)
+    if not synsets:
+        return None  # Word not found in WordNet
+
+    # Define target categories and their corresponding keywords
+    categories = {
+        'automobile': ['vehicle', 'car', 'automobile'],
+        'animal': ['animal', 'mammal', 'reptile', 'bird'],
+        'vegetable': ['vegetable', 'plant', 'edible_plant']
+    }
+
+    # Analyze hypernyms of each synset
+    for syn in synsets:
+        hypernyms = syn.hypernym_paths()
+        for path in hypernyms:
+            for hyper in path:
+                for category, keywords in categories.items():
+                    if any(keyword in hyper.name().lower() for keyword in keywords):
+                        return category
+    return None  # No matching category found
 
 # Game Class
 class ReflexGame:
@@ -87,8 +108,17 @@ class ReflexGame:
             messagebox.showerror("Error", "Please enter exactly 5 words.")
             return
 
-        # Use get_correct_category to classify words
-        self.classified_new_words = {word: self.get_correct_category(word) for word in self.new_words}
+        # Use get_word_category to classify words
+        self.classified_new_words = {}
+        for word in self.new_words:
+            category = get_word_category(word)
+            if category:
+                self.classified_new_words[word] = category
+                # Dynamically update the word_database
+                word_database.setdefault(category, []).append(word)
+            else:
+                self.classified_new_words[word] = "unknown"
+
         unknown_words = [word for word, cat in self.classified_new_words.items() if cat == "unknown"]
         self.new_words = [word for word in self.new_words if self.classified_new_words[word] != "unknown"]
 
@@ -111,8 +141,18 @@ class ReflexGame:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        db_words = random.sample(word_database["automobile"] + word_database["animal"] + word_database["vegetable"], 5)
-        self.game_words = db_words + self.new_words
+        # Ensure exactly 5 words are picked from the database
+        db_words = []
+        for category in ["automobile", "animal", "vegetable"]:
+            db_words.extend(random.sample(word_database[category], min(2, len(word_database[category]))))
+
+        # If fewer than 5 words are selected, fill the remaining slots randomly
+        while len(db_words) < 5:
+            remaining_words = word_database["automobile"] + word_database["animal"] + word_database["vegetable"]
+            db_words.append(random.choice(remaining_words))
+
+        # Combine database words with user-entered words
+        self.game_words = db_words[:5] + self.new_words
         self.game_words = [word for word in self.game_words if classify_word(word) != "unknown"]
         random.shuffle(self.game_words)
         self.current_word_index = 0
