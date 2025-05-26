@@ -141,19 +141,22 @@ class ReflexGame:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        # Ensure exactly 5 words are picked from the database
-        db_words = []
-        for category in ["automobile", "animal", "vegetable"]:
-            db_words.extend(random.sample(word_database[category], min(2, len(word_database[category]))))
+        # Ensure user-entered words are added first
+        self.game_words = self.new_words[:]
 
-        # If fewer than 5 words are selected, fill the remaining slots randomly
-        while len(db_words) < 5:
-            remaining_words = word_database["automobile"] + word_database["animal"] + word_database["vegetable"]
-            db_words.append(random.choice(remaining_words))
+        # Collect all database words excluding user-entered words
+        remaining_words = [
+            word for category in word_database.values() for word in category
+            if word not in self.new_words
+        ]
 
-        # Combine database words with user-entered words
-        self.game_words = db_words[:5] + self.new_words
-        self.game_words = [word for word in self.game_words if classify_word(word) != "unknown"]
+        # Add 5 random words from the remaining database words
+        db_words = random.sample(remaining_words, min(5, len(remaining_words)))
+
+        # Combine user-entered words with random database words
+        self.game_words += db_words
+
+        # Shuffle the final list of game words
         random.shuffle(self.game_words)
         self.current_word_index = 0
 
