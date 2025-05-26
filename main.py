@@ -1,3 +1,6 @@
+#Ai Game: Reflex Game
+#Ali Zafar [221443]
+#Shumail Ali [221479]
 import tkinter as tk
 from tkinter import messagebox
 import random
@@ -108,17 +111,9 @@ class ReflexGame:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        # Get 5 random words from each category first
-        db_words = []
-        for category in ["automobile", "animal", "vegetable"]:
-            db_words.extend(random.sample(word_database[category], min(5, len(word_database[category]))))
-        
-        # Then randomly select 5 words from all selected words
-        db_words = random.sample(db_words, 5)
-        
-        # Combine with user's new words and shuffle
+        db_words = random.sample(word_database["automobile"] + word_database["animal"] + word_database["vegetable"], 5)
         self.game_words = db_words + self.new_words
-        self.game_words = [word for word in self.game_words if self.get_correct_category(word) != "unknown"]
+        self.game_words = [word for word in self.game_words if classify_word(word) != "unknown"]
         random.shuffle(self.game_words)
         self.current_word_index = 0
 
@@ -205,9 +200,14 @@ class ReflexGame:
     def end_game(self):
         self.root.unbind("<Key>")
 
-        # Calculate scores based on unique correct answers
-        correct_user = sum(1 for word, correct in self.user_results.items() if correct)
-        correct_ai = sum(1 for word, correct in self.ai_results.items() if correct)
+        # Recalculate correct answers based on the game_words order.
+        correct_user = 0
+        correct_ai = 0
+        for word in self.game_words:
+            if self.user_results.get(word, False):
+                correct_user += 1
+            if self.ai_results.get(word, False):
+                correct_ai += 1
 
         if correct_user > correct_ai:
             result = "You Win!"
@@ -219,13 +219,13 @@ class ReflexGame:
         self.status_label.config(text=f"{result} (You: {correct_user}, AI: {correct_ai})")
         self.word_label.config(text="Game Over!")
 
-        # Highlight user results
+        # Highlight results for user words
         for cat, lst in self.user_labels.items():
             for i in range(lst.size()):
                 word = lst.get(i)
                 lst.itemconfig(i, {'fg': 'green' if self.user_results.get(word, False) else 'red'})
 
-        # Highlight AI results
+        # Highlight results for AI words
         for cat, lst in self.ai_labels.items():
             for i in range(lst.size()):
                 word = lst.get(i)
